@@ -35,7 +35,7 @@
             background-color: #ccc;
         }
         .answer {
-            margin-top: 20px;
+            margin-top: 10px;
             padding: 15px;
             background-color: #f8f9fa;
             border-radius: 5px;
@@ -52,6 +52,24 @@
             border: 1px solid #eee;
             border-radius: 3px;
         }
+        .citation-text {
+            font-style: italic;
+            color: #444;
+            margin-bottom: 5px;
+        }
+        .citation-source {
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .source-pdf {
+            color: #007bff;
+            margin-bottom: 3px;
+        }
+        .source-section {
+            color: #28a745;
+            font-style: italic;
+        }
         #loading {
             display: none;
             margin: 20px 0;
@@ -66,6 +84,24 @@
         
         .pdf-list h3 {
             margin-top: 0;
+        }
+        .question {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .qa-pair {
+            margin-bottom: 30px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .question {
+            padding: 12px 15px;
+            background-color: #e9ecef;
+            border-bottom: 1px solid #dee2e6;
         }
     </style>
 </head>
@@ -109,11 +145,18 @@
                 }
 
                 // Create response HTML
+                const responseWrapper = document.createElement('div');
+                
+                // Add the question
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question';
+                questionDiv.innerHTML = `Q: ${query}`;
+                responseWrapper.appendChild(questionDiv);
+                
+                // Add the answer
                 const answerDiv = document.createElement('div');
                 answerDiv.className = 'answer';
-                
-                // Add the main answer
-                answerDiv.innerHTML = `<strong>Answer:</strong> ${data.answer}`;
+                answerDiv.innerHTML = `<strong>A:</strong> ${data.answer}`;
                 
                 // Add citations if any
                 if (data.citations && data.citations.length > 0) {
@@ -124,8 +167,11 @@
                     data.citations.forEach((citation, index) => {
                         citationsDiv.innerHTML += `
                             <div class="citation">
-                                <div>${index + 1}. "${citation.text}"</div>
-                                <div><em>From: ${citation.source}</em></div>
+                                <div class="citation-text">"${citation.text}"</div>
+                                <div class="citation-source">
+                                    <div class="source-pdf">Source: ${citation.source.pdf}</div>
+                                    <div class="source-section">Context: ${citation.source.section}</div>
+                                </div>
                             </div>
                         `;
                     });
@@ -133,8 +179,10 @@
                     answerDiv.appendChild(citationsDiv);
                 }
                 
+                responseWrapper.appendChild(answerDiv);
+                
                 // Add the new response at the top
-                responseContainer.insertBefore(answerDiv, responseContainer.firstChild);
+                responseContainer.insertBefore(responseWrapper, responseContainer.firstChild);
                 
             } catch (error) {
                 alert('Error: ' + error.message);
