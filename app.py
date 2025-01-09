@@ -4,6 +4,7 @@ import numpy as np
 from PyPDF2 import PdfReader
 import os
 from dotenv import load_dotenv
+import glob
 
 # Load environment variables
 load_dotenv()
@@ -13,11 +14,11 @@ app = Flask(__name__)
 # Initialize Cohere client with environment variable
 co = cohere.ClientV2(api_key=os.getenv('COHERE_API_KEY'))
 
-# Load and process documents at startup
 def extract_pdf_text(pdf_path):
     reader = PdfReader(pdf_path)
     documents = []
     
+    print(f"Processing {pdf_path}...")
     for page in reader.pages:
         try:
             page_text = page.extract_text()
@@ -27,11 +28,12 @@ def extract_pdf_text(pdf_path):
                 if len(chunk) > 50:
                     documents.append({
                         "data": {
-                            "text": chunk + "."
+                            "text": chunk + ".",
+                            "source": os.path.basename(pdf_path)  # Add source PDF filename
                         }
                     })
         except Exception as e:
-            print(f"Error extracting text from page: {e}")
+            print(f"Error extracting text from page in {pdf_path}: {e}")
             continue
     
     return documents
@@ -52,17 +54,22 @@ def batch_embed_documents(documents, batch_size=96):
     
     return np.array(all_embeddings)
 
-# Load documents and create embeddings at startup
-print("Loading and processing PDF...")
-documents = extract_pdf_text("indianadoe.pdf")
-print(f"Total documents extracted: {len(documents)}")
+# Load all PDFs and create embeddings at startup
+print("Loading and processing PDFs...")
+documents = []
+for pdf_file in glob.glob("*.pdf"):
+    documents.extend(extract_pdf_text(pdf_file))
+
+print(f"Total documents extracted across all PDFs: {len(documents)}")
 
 print("Creating embeddings...")
 doc_embeddings = batch_embed_documents(documents)
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    # Pass the list of loaded PDFs to the template
+    pdf_files = [pdf for pdf in glob.glob("*.pdf")]
+    return render_template('index.html', pdf_files=pdf_files)
 
 @app.route('/ask', methods=['POST'])
 def ask():
@@ -106,9 +113,10 @@ def ask():
         citations = []
         if chat_response.message.citations:
             for citation in chat_response.message.citations:
+                source_doc = citation.sources[0].document
                 citations.append({
                     'text': citation.text,
-                    'source': citation.sources[0].document['text'][:200] + "..."
+                    'source': f"{source_doc['text'][:200]}... (from {source_doc.get('source', 'unknown')})"
                 })
         
         return jsonify({
