@@ -1,44 +1,147 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Chat</title>
+    <title>Indiana DOE Document Assistant</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        #chat-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+        }
+        #query-input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        #submit-btn {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #submit-btn:disabled {
+            background-color: #ccc;
+        }
+        .answer {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .citations {
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .citation {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #fff;
+            border: 1px solid #eee;
+            border-radius: 3px;
+        }
+        #loading {
+            display: none;
+            margin: 20px 0;
+            color: #666;
+        }
+    </style>
 </head>
 <body>
-    <h1>Chat with the PDF</h1>
-    <form id="queryForm">
-        <label for="query">Enter your question:</label>
-        <input type="text" id="query" name="query" required>
-        <button type="submit">Ask</button>
-    </form>
-    <h2>Results:</h2>
-    <ul id="results"></ul>
+    <h1>Indiana DOE Document Assistant</h1>
+    <div id="chat-container">
+        <textarea id="query-input" rows="3" placeholder="Ask a question about the document..."></textarea>
+        <button id="submit-btn">Ask Question</button>
+        <div id="loading">Processing your question...</div>
+        <div id="response-container"></div>
+    </div>
 
     <script>
-        const form = document.getElementById("queryForm");
-        form.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const query = document.getElementById("query").value;
+        const submitBtn = document.getElementById('submit-btn');
+        const queryInput = document.getElementById('query-input');
+        const loadingDiv = document.getElementById('loading');
+        const responseContainer = document.getElementById('response-container');
 
-            const response = await fetch("/query", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query }),
-            });
+        submitBtn.addEventListener('click', async () => {
+            const query = queryInput.value.trim();
+            if (!query) return;
+
+            // Disable input and show loading
+            submitBtn.disabled = true;
+            queryInput.disabled = true;
+            loadingDiv.style.display = 'block';
             
-            const data = await response.json();
-            const resultsList = document.getElementById("results");
-            resultsList.innerHTML = "";
-            
-            if (data.results) {
-                data.results.forEach(result => {
-                    const listItem = document.createElement("li");
-                    listItem.textContent = `${result.text} (Score: ${result.score})`;
-                    resultsList.appendChild(listItem);
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query }),
                 });
-            } else {
-                resultsList.textContent = "No results found.";
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // Create response HTML
+                const answerDiv = document.createElement('div');
+                answerDiv.className = 'answer';
+                
+                // Add the main answer
+                answerDiv.innerHTML = `<strong>Answer:</strong> ${data.answer}`;
+                
+                // Add citations if any
+                if (data.citations && data.citations.length > 0) {
+                    const citationsDiv = document.createElement('div');
+                    citationsDiv.className = 'citations';
+                    citationsDiv.innerHTML = '<strong>Sources:</strong>';
+                    
+                    data.citations.forEach((citation, index) => {
+                        citationsDiv.innerHTML += `
+                            <div class="citation">
+                                <div>${index + 1}. "${citation.text}"</div>
+                                <div><em>From: ${citation.source}</em></div>
+                            </div>
+                        `;
+                    });
+                    
+                    answerDiv.appendChild(citationsDiv);
+                }
+                
+                // Add the new response at the top
+                responseContainer.insertBefore(answerDiv, responseContainer.firstChild);
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                // Re-enable input and hide loading
+                submitBtn.disabled = false;
+                queryInput.disabled = false;
+                loadingDiv.style.display = 'none';
+                queryInput.value = '';
+            }
+        });
+
+        // Also submit on Enter (but Shift+Enter for new line)
+        queryInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitBtn.click();
             }
         });
     </script>

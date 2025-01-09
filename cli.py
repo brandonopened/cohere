@@ -1,14 +1,10 @@
-from flask import Flask, request, render_template, jsonify
 import cohere
 import numpy as np
 from PyPDF2 import PdfReader
 
-app = Flask(__name__)
-
 # Initialize Cohere client
 co = cohere.ClientV2(api_key="VvImZNZXUXLfUq23reRIyTTlqI2SvRiQOBOwKK18")
 
-# Load and process documents at startup
 def extract_pdf_text(pdf_path):
     reader = PdfReader(pdf_path)
     documents = []
@@ -16,13 +12,16 @@ def extract_pdf_text(pdf_path):
     for page in reader.pages:
         try:
             page_text = page.extract_text()
+            # Clean up the text
             page_text = ' '.join(line.strip() for line in page_text.split('\n') if line.strip())
+            
+            # Split into meaningful chunks and filter
             chunks = [chunk.strip() for chunk in page_text.split('.') if chunk.strip()]
             for chunk in chunks:
-                if len(chunk) > 50:
+                if len(chunk) > 50:  # Only keep substantial chunks
                     documents.append({
                         "data": {
-                            "text": chunk + "."
+                            "text": chunk + "."  # Add back the period
                         }
                     })
         except Exception as e:
@@ -32,6 +31,7 @@ def extract_pdf_text(pdf_path):
     return documents
 
 def batch_embed_documents(documents, batch_size=96):
+    """Embed documents in batches to stay within API limits."""
     all_embeddings = []
     texts = [doc['data']['text'] for doc in documents]
     
@@ -47,25 +47,24 @@ def batch_embed_documents(documents, batch_size=96):
     
     return np.array(all_embeddings)
 
-# Load documents and create embeddings at startup
-print("Loading and processing PDF...")
-documents = extract_pdf_text("indianadoe.pdf")
-print(f"Total documents extracted: {len(documents)}")
-
-print("Creating embeddings...")
-doc_embeddings = batch_embed_documents(documents)
-
-@app.route('/')
-def home():
-    return render_template('index.html')
-
-@app.route('/ask', methods=['POST'])
-def ask():
-    query = request.json.get('query', '').strip()
-    if not query:
-        return jsonify({'error': 'No query provided'}), 400
+def main():
+    # Load and process the PDF
+    print("Loading and processing PDF...")
+    documents = extract_pdf_text("indianadoe.pdf")
+    print(f"Total documents extracted: {len(documents)}")
     
-    try:
+    # Create embeddings
+    print("Creating embeddings...")
+    doc_embeddings = batch_embed_documents(documents)
+    
+    print("\nReady to answer questions! (Type 'quit' to exit)")
+    
+    while True:
+        query = input("\nWhat would you like to know about the document? ").strip()
+        
+        if query.lower() == 'quit':
+            break
+            
         # Embed the query
         query_embedding = co.embed(
             model="embed-english-v3.0",
@@ -97,22 +96,14 @@ def ask():
             documents=reranked_documents
         )
         
-        # Format response with citations
-        citations = []
+        # Print response and citations
+        print("\nAnswer:", chat_response.message.content[0].text)
+        
         if chat_response.message.citations:
-            for citation in chat_response.message.citations:
-                citations.append({
-                    'text': citation.text,
-                    'source': citation.sources[0].document['text'][:200] + "..."
-                })
-        
-        return jsonify({
-            'answer': chat_response.message.content[0].text,
-            'citations': citations
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+            print("\nSources:")
+            for i, citation in enumerate(chat_response.message.citations, 1):
+                print(f"\n{i}. {citation.text}")
+                print(f"   From: {citation.sources[0].document['text'][:200]}...")
 
-if __name__ == '__main__':
-    app.run(debug=True, use_reloader=False, port=5001)
+if __name__ == "__main__":
+    main()
