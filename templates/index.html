@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Chat</title>
+</head>
+<body>
+    <h1>Chat with the PDF</h1>
+    <form id="queryForm">
+        <label for="query">Enter your question:</label>
+        <input type="text" id="query" name="query" required>
+        <button type="submit">Ask</button>
+    </form>
+    <h2>Results:</h2>
+    <ul id="results"></ul>
+
+    <script>
+        const form = document.getElementById("queryForm");
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const query = document.getElementById("query").value;
+
+            const response = await fetch("/query", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query }),
+            });
+            
+            const data = await response.json();
+            const resultsList = document.getElementById("results");
+            resultsList.innerHTML = "";
+            
+            if (data.results) {
+                data.results.forEach(result => {
+                    const listItem = document.createElement("li");
+                    listItem.textContent = `${result.text} (Score: ${result.score})`;
+                    resultsList.appendChild(listItem);
+                });
+            } else {
+                resultsList.textContent = "No results found.";
+            }
+        });
+    </script>
+</body>
+</html>
