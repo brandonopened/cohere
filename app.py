@@ -2,11 +2,16 @@ from flask import Flask, request, render_template, jsonify
 import cohere
 import numpy as np
 from PyPDF2 import PdfReader
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 
-# Initialize Cohere client
-co = cohere.ClientV2(api_key="VvImZNZXUXLfUq23reRIyTTlqI2SvRiQOBOwKK18")
+# Initialize Cohere client with environment variable
+co = cohere.ClientV2(api_key=os.getenv('COHERE_API_KEY'))
 
 # Load and process documents at startup
 def extract_pdf_text(pdf_path):
